@@ -684,7 +684,7 @@ async function fetchApiHistory() {
   if (S.histLoading) return;
   S.histLoading = true;
   try {
-    const res = await fetch(`${API}/v1/historico/dolares/${S.rateType}`);
+    const res = await fetch(`${API}/v1/historicos/dolares/${S.rateType}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     S.apiHist = Array.isArray(data) ? data : [];
@@ -743,7 +743,7 @@ async function fetchDateRate() {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
       try {
-        const res = await fetch(`${API}/v1/historico/dolares/${S.rateType}`, { signal: controller.signal });
+        const res = await fetch(`${API}/v1/historicos/dolares/${S.rateType}`, { signal: controller.signal });
         clearTimeout(timeout);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
