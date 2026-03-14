@@ -37,8 +37,8 @@ body{background:linear-gradient(145deg,#060a14 0%,#0b1020 60%,#070d1a 100%);colo
 /* ── LAYOUT ── */
 .app{display:flex;flex-direction:column;min-height:100vh;min-height:100svh;max-width:480px;margin:0 auto;position:relative}
 .header{padding:calc(var(--safe-top) + 14px) 18px 12px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid var(--border)}
-.content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:16px 16px 90px;display:flex;flex-direction:column;gap:13px}
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;width:100%;max-width:480px;margin:0 auto;padding:8px 8px 12px;background:rgba(6,10,20,0.98);border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);z-index:100;gap:2px}
+.content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:16px 16px 90px;display:flex;flex-direction:column;gap:13px;touch-action:pan-y}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;width:100%;max-width:480px;margin:0 auto;padding:8px 8px 12px;background:rgba(6,10,20,0.98);border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);z-index:999;gap:2px;touch-action:manipulation}
 
 /* ── HEADER ── */
 .logo{display:flex;align-items:center;gap:9px}
@@ -53,7 +53,7 @@ body{background:linear-gradient(145deg,#060a14 0%,#0b1020 60%,#070d1a 100%);colo
 .offline-badge.show{display:block}
 
 /* ── NAV ── */
-.nav-item{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:5px 4px;border:none;background:none;color:var(--dim);font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;font-family:'DM Sans',sans-serif;transition:all .2s;border-radius:10px;position:relative}
+.nav-item{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:5px 4px;border:none;background:none;color:var(--dim);font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;font-family:'DM Sans',sans-serif;transition:color .15s;border-radius:10px;position:relative;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none}
 .nav-item.active{color:var(--gold)}
 .nav-item .ni{font-size:19px;transition:transform .2s}
 .nav-item.active .ni{transform:scale(1.1)}
@@ -61,7 +61,7 @@ body{background:linear-gradient(145deg,#060a14 0%,#0b1020 60%,#070d1a 100%);colo
 .nav-item.active .nav-dot{opacity:1}
 
 /* ── TABS ── */
-.tab-content{display:none;flex-direction:column;gap:13px;animation:fadeIn .2s ease}
+.tab-content{display:none;flex-direction:column;gap:13px}
 .tab-content.active{display:flex}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 
@@ -597,6 +597,7 @@ let S = {
   apiHist: [],
   chart: null,
   loading: false,
+  histLoading: false,
   deferredInstall: null,
   dateRateCache: {},
   currentDateRate: null,
@@ -680,12 +681,17 @@ async function fetchEuro() {
 //  FETCH HISTORICAL RATES
 // ═══════════════════════════════════════════
 async function fetchApiHistory() {
+  if (S.histLoading) return;
+  S.histLoading = true;
   try {
     const res = await fetch(`${API}/v1/historico/dolares/${S.rateType}`);
-    S.apiHist = await res.json();
-    if (!Array.isArray(S.apiHist)) S.apiHist = [];
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    S.apiHist = Array.isArray(data) ? data : [];
   } catch {
     S.apiHist = [];
+  } finally {
+    S.histLoading = false;
   }
   renderChart();
   renderHistTable();
@@ -697,63 +703,102 @@ async function fetchDateRate() {
   const dateVal = dateInput.value;
   if (!dateVal) { showToast('Selecciona una fecha'); return; }
 
-  const errEl = document.getElementById('dateError');
-  const resEl = document.getElementById('dateResult');
+  const errEl  = document.getElementById('dateError');
+  const resEl  = document.getElementById('dateResult');
+  const btn    = document.querySelector('.btn-fetch-date');
+
+  // Reset UI
   errEl.classList.remove('show');
   resEl.classList.remove('show');
   document.getElementById('drInput').value = '';
   document.getElementById('drOutput').textContent = '—';
+  document.getElementById('copyDateResultBtn').classList.remove('show');
 
-  // Check cache
-  const cacheKey = `${dateVal}_${S.rateType}`;
-  if (S.dateRateCache[cacheKey]) {
-    renderDateResult(S.dateRateCache[cacheKey], dateVal);
-    return;
-  }
+  // Button loading state
+  const origTxt = btn.textContent;
+  btn.textContent = '⏳';
+  btn.disabled = true;
 
-  // Check local history first
-  const local = S.history.find(h => h.d === dateVal && h.t === S.rateType);
-  if (local) {
-    const entry = { compra: local.c, promedio: local.p, venta: local.v, fechaActualizacion: local.fa };
-    S.dateRateCache[cacheKey] = entry;
-    renderDateResult(entry, dateVal);
-    return;
-  }
+  const restore = () => { btn.textContent = origTxt; btn.disabled = false; };
 
-  // Fetch from API historical
   try {
-    if (!S.apiHist.length) {
-      const res = await fetch(`${API}/v1/historico/dolares/${S.rateType}`);
-      S.apiHist = await res.json();
+    // 1. Check memory cache first
+    const cacheKey = `${dateVal}_${S.rateType}`;
+    if (S.dateRateCache[cacheKey]) {
+      renderDateResult(S.dateRateCache[cacheKey], dateVal);
+      restore(); return;
     }
-    // Find the entry matching or closest to the date
-    const entry = S.apiHist.find(h => {
-      const d = (h.fechaActualizacion || h.fecha || '').split('T')[0];
-      return d === dateVal;
-    });
+
+    // 2. Check local stored history
+    const local = S.history.find(h => h.d === dateVal && h.t === S.rateType);
+    if (local) {
+      const entry = { compra: local.c, promedio: local.p, venta: local.v, fechaActualizacion: local.fa };
+      S.dateRateCache[cacheKey] = entry;
+      renderDateResult(entry, dateVal);
+      restore(); return;
+    }
+
+    // 3. Fetch full history if not loaded yet (with timeout)
+    if (!S.apiHist.length) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+      try {
+        const res = await fetch(`${API}/v1/historico/dolares/${S.rateType}`, { signal: controller.signal });
+        clearTimeout(timeout);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        S.apiHist = Array.isArray(data) ? data : [];
+      } catch (fetchErr) {
+        clearTimeout(timeout);
+        if (fetchErr.name === 'AbortError') {
+          errEl.textContent = '⏱ Tiempo de espera agotado. Verifica tu conexión e intenta de nuevo.';
+        } else {
+          errEl.textContent = '📡 Sin conexión. Conecta a internet y vuelve a intentarlo.';
+        }
+        errEl.classList.add('show');
+        restore(); return;
+      }
+    }
+
+    if (!S.apiHist.length) {
+      errEl.textContent = 'No hay datos históricos disponibles en este momento.';
+      errEl.classList.add('show');
+      restore(); return;
+    }
+
+    // 4. Find exact date match
+    const getDate = h => (h.fechaActualizacion || h.fecha || '').split('T')[0];
+    const entry = S.apiHist.find(h => getDate(h) === dateVal);
 
     if (entry) {
       S.dateRateCache[cacheKey] = entry;
       renderDateResult(entry, dateVal);
     } else {
-      // Find closest date
-      const sorted = S.apiHist
-        .map(h => ({ ...h, _d: (h.fechaActualizacion || h.fecha || '').split('T')[0] }))
-        .filter(h => h._d)
-        .sort((a,b) => Math.abs(new Date(a._d)-new Date(dateVal)) - Math.abs(new Date(b._d)-new Date(dateVal)));
-      if (sorted.length && sorted[0]) {
-        S.dateRateCache[cacheKey] = sorted[0];
-        renderDateResult(sorted[0], dateVal, sorted[0]._d);
-        showToast(`No hay datos exactos. Mostrando ${fD(sorted[0]._d)}`);
-      } else {
+      // 5. Find closest available date (weekends/holidays have no data)
+      const withDates = S.apiHist
+        .map(h => ({ ...h, _d: getDate(h) }))
+        .filter(h => h._d);
+
+      if (!withDates.length) {
+        errEl.textContent = 'No se encontraron datos históricos.';
         errEl.classList.add('show');
-        errEl.textContent = 'No se encontraron datos para esta fecha. Intenta otra fecha.';
+        restore(); return;
       }
+
+      const target = new Date(dateVal).getTime();
+      withDates.sort((a, b) => Math.abs(new Date(a._d) - target) - Math.abs(new Date(b._d) - target));
+      const closest = withDates[0];
+      S.dateRateCache[cacheKey] = closest;
+      renderDateResult(closest, dateVal, closest._d);
+      showToast(`📅 ${dateVal} sin datos. Mostrando ${fD(closest._d)}`);
     }
+
   } catch(e) {
+    errEl.textContent = '❌ Error inesperado. Intenta de nuevo.';
     errEl.classList.add('show');
-    errEl.textContent = 'Error al consultar. Verifica tu conexión.';
   }
+
+  restore();
 }
 
 function renderDateResult(entry, requestedDate, actualDate) {
@@ -1185,19 +1230,23 @@ function refreshPresetLabels() {
 // ═══════════════════════════════════════════
 //  TAB + RATE TYPE
 // ═══════════════════════════════════════════
+let tabSwitching = false;
 function setTab(tab) {
+  if (tabSwitching || S.currentTab === tab) return;
+  tabSwitching = true;
   S.currentTab = tab;
+
   ['home','calc','hist','cfg'].forEach(t => {
     document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
-    const nav = document.getElementById(`nav-${t}`);
-    nav.classList.toggle('active', t === tab);
+    document.getElementById(`nav-${t}`).classList.toggle('active', t === tab);
   });
-  if (tab === 'hist') {
-    fetchApiHistory();
-  }
-  if (tab === 'cfg') updateCfgInfo();
-  // Scroll content to top
+
   document.getElementById('mainContent').scrollTop = 0;
+
+  if (tab === 'hist') fetchApiHistory();
+  if (tab === 'cfg') updateCfgInfo();
+
+  setTimeout(() => { tabSwitching = false; }, 150);
 }
 
 function setRateType(type) {
