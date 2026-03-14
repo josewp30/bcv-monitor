@@ -1,6 +1,6 @@
 // ─── VERSIÓN ────────────────────────────────────────────────────────────────
 // Cambia este número cada vez que subas cambios a GitHub.
-const VERSION = '1.0.4';
+const VERSION = '1.0.5';
 const CACHE_NAME = `bcv-monitor-${VERSION}`;
 
 const STATIC_ASSETS = [

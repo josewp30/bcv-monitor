@@ -598,6 +598,7 @@ let S = {
   chart: null,
   loading: false,
   histLoading: false,
+  _apiHistType: null,
   deferredInstall: null,
   dateRateCache: {},
   currentDateRate: null,
@@ -680,16 +681,69 @@ async function fetchEuro() {
 // ═══════════════════════════════════════════
 //  FETCH HISTORICAL RATES
 // ═══════════════════════════════════════════
+// ─── MULTI-API FETCH CON FALLBACK ────────────────────────────────────────────
+// Lista de fuentes para el histórico — se prueban en orden hasta que una funcione
+const HIST_SOURCES = [
+  // Fuente 1: ve.dolarapi.com directa
+  type => `https://ve.dolarapi.com/v1/historicos/dolares/${type}`,
+  // Fuente 2: CORS proxy de allorigins
+  type => `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://ve.dolarapi.com/v1/historicos/dolares/${type}`)}`,
+  // Fuente 3: corsproxy.io
+  type => `https://corsproxy.io/?${encodeURIComponent(`https://ve.dolarapi.com/v1/historicos/dolares/${type}`)}`,
+];
+
+async function fetchWithTimeout(url, ms = 8000) {
+  const ctrl = new AbortController();
+  const tid  = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(tid);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res;
+  } catch(e) {
+    clearTimeout(tid);
+    throw e;
+  }
+}
+
+async function fetchHistorico(type) {
+  // Primero verificar si ya tenemos datos en memoria para este tipo
+  if (S.apiHist.length && S._apiHistType === type) return S.apiHist;
+
+  for (const buildUrl of HIST_SOURCES) {
+    try {
+      const res  = await fetchWithTimeout(buildUrl(type), 8000);
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        S.apiHist      = data;
+        S._apiHistType = type;
+        return data;
+      }
+    } catch(e) {
+      // silently try next source
+    }
+  }
+
+  // Si todo falla, retornar historial local convertido
+  const local = S.history
+    .filter(h => h.t === type)
+    .map(h => ({ fecha: h.d, compra: h.c, promedio: h.p, venta: h.v }));
+  if (local.length) return local;
+
+  throw new Error('Sin datos disponibles en ninguna fuente');
+}
+
+// ─── CARGAR HISTORIAL PARA GRÁFICA ───────────────────────────────────────────
 async function fetchApiHistory() {
   if (S.histLoading) return;
   S.histLoading = true;
   try {
-    const res = await fetch(`${API}/v1/historicos/dolares/${S.rateType}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    S.apiHist = Array.isArray(data) ? data : [];
+    S.apiHist = await fetchHistorico(S.rateType);
   } catch {
-    S.apiHist = [];
+    // Fallback silencioso al historial local
+    S.apiHist = S.history
+      .filter(h => h.t === S.rateType)
+      .map(h => ({ fecha: h.d, compra: h.c, promedio: h.p, venta: h.v }));
   } finally {
     S.histLoading = false;
   }
@@ -697,15 +751,15 @@ async function fetchApiHistory() {
   renderHistTable();
 }
 
-// Fetch rate for a specific date from API history
+// ─── CONSULTAR TASA POR FECHA ─────────────────────────────────────────────────
 async function fetchDateRate() {
   const dateInput = document.getElementById('datePickerCalc');
-  const dateVal = dateInput.value;
+  const dateVal   = dateInput.value;
   if (!dateVal) { showToast('Selecciona una fecha'); return; }
 
-  const errEl  = document.getElementById('dateError');
-  const resEl  = document.getElementById('dateResult');
-  const btn    = document.querySelector('.btn-fetch-date');
+  const errEl = document.getElementById('dateError');
+  const resEl = document.getElementById('dateResult');
+  const btn   = document.querySelector('.btn-fetch-date');
 
   // Reset UI
   errEl.classList.remove('show');
@@ -714,83 +768,75 @@ async function fetchDateRate() {
   document.getElementById('drOutput').textContent = '—';
   document.getElementById('copyDateResultBtn').classList.remove('show');
 
-  // Button loading state
+  // Estado de carga en botón
   const origTxt = btn.textContent;
   btn.textContent = '⏳';
   btn.disabled = true;
-
   const restore = () => { btn.textContent = origTxt; btn.disabled = false; };
 
+  const getDate = h => (h.fecha || h.fechaActualizacion || '').split('T')[0];
+
   try {
-    // 1. Check memory cache first
+    // 1. Caché en memoria
     const cacheKey = `${dateVal}_${S.rateType}`;
     if (S.dateRateCache[cacheKey]) {
       renderDateResult(S.dateRateCache[cacheKey], dateVal);
       restore(); return;
     }
 
-    // 2. Check local stored history
+    // 2. Historial local guardado
     const local = S.history.find(h => h.d === dateVal && h.t === S.rateType);
     if (local) {
-      const entry = { compra: local.c, promedio: local.p, venta: local.v, fechaActualizacion: local.fa };
+      const entry = { compra: local.c, promedio: local.p, venta: local.v, fecha: local.d };
       S.dateRateCache[cacheKey] = entry;
       renderDateResult(entry, dateVal);
       restore(); return;
     }
 
-    // 3. Fetch full history if not loaded yet (with timeout)
-    if (!S.apiHist.length) {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
-      try {
-        const res = await fetch(`${API}/v1/historicos/dolares/${S.rateType}`, { signal: controller.signal });
-        clearTimeout(timeout);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        S.apiHist = Array.isArray(data) ? data : [];
-      } catch (fetchErr) {
-        clearTimeout(timeout);
-        if (fetchErr.name === 'AbortError') {
-          errEl.textContent = '⏱ Tiempo de espera agotado. Verifica tu conexión e intenta de nuevo.';
-        } else {
-          errEl.textContent = '📡 Sin conexión. Conecta a internet y vuelve a intentarlo.';
-        }
-        errEl.classList.add('show');
+    // 3. Buscar en apiHist ya cargado
+    if (S.apiHist.length) {
+      const hit = S.apiHist.find(h => getDate(h) === dateVal);
+      if (hit) {
+        S.dateRateCache[cacheKey] = hit;
+        renderDateResult(hit, dateVal);
         restore(); return;
       }
     }
 
-    if (!S.apiHist.length) {
-      errEl.textContent = 'No hay datos históricos disponibles en este momento.';
+    // 4. Fetch con múltiples fuentes de respaldo
+    showToast('🔍 Buscando tasa histórica...');
+    let hist = [];
+    try {
+      hist = await fetchHistorico(S.rateType);
+    } catch(e) {
+      errEl.textContent = '📡 No se pudo obtener el historial. Guarda tasas diariamente para consultarlas sin conexión.';
       errEl.classList.add('show');
       restore(); return;
     }
 
-    // 4. Find exact date match
-    const getDate = h => (h.fechaActualizacion || h.fecha || '').split('T')[0];
-    const entry = S.apiHist.find(h => getDate(h) === dateVal);
+    // 5. Buscar fecha exacta
+    const exact = hist.find(h => getDate(h) === dateVal);
+    if (exact) {
+      S.dateRateCache[cacheKey] = exact;
+      renderDateResult(exact, dateVal);
+      restore(); return;
+    }
 
-    if (entry) {
-      S.dateRateCache[cacheKey] = entry;
-      renderDateResult(entry, dateVal);
-    } else {
-      // 5. Find closest available date (weekends/holidays have no data)
-      const withDates = S.apiHist
-        .map(h => ({ ...h, _d: getDate(h) }))
-        .filter(h => h._d);
+    // 6. Fecha más cercana (fines de semana / feriados no tienen tasa)
+    const target = new Date(dateVal).getTime();
+    const sorted = hist
+      .map(h => ({ ...h, _d: getDate(h) }))
+      .filter(h => h._d)
+      .sort((a, b) => Math.abs(new Date(a._d) - target) - Math.abs(new Date(b._d) - target));
 
-      if (!withDates.length) {
-        errEl.textContent = 'No se encontraron datos históricos.';
-        errEl.classList.add('show');
-        restore(); return;
-      }
-
-      const target = new Date(dateVal).getTime();
-      withDates.sort((a, b) => Math.abs(new Date(a._d) - target) - Math.abs(new Date(b._d) - target));
-      const closest = withDates[0];
+    if (sorted.length) {
+      const closest = sorted[0];
       S.dateRateCache[cacheKey] = closest;
       renderDateResult(closest, dateVal, closest._d);
-      showToast(`📅 ${dateVal} sin datos. Mostrando ${fD(closest._d)}`);
+      showToast(`📅 Sin datos para ${dateVal}. Mostrando ${fD(closest._d)}`);
+    } else {
+      errEl.textContent = 'No se encontraron datos para esta fecha.';
+      errEl.classList.add('show');
     }
 
   } catch(e) {
@@ -800,6 +846,7 @@ async function fetchDateRate() {
 
   restore();
 }
+
 
 function renderDateResult(entry, requestedDate, actualDate) {
   S.currentDateRate = entry;
@@ -1253,7 +1300,9 @@ function setRateType(type) {
   S.rateType = type;
   document.getElementById('btnOficial').classList.toggle('active', type === 'oficial');
   document.getElementById('btnParalelo').classList.toggle('active', type === 'paralelo');
-  S.dateRateCache = {}; // clear date cache on type change
+  S.dateRateCache = {};
+  S.apiHist = [];
+  S._apiHistType = null;
   S.currentDateRate = null;
   document.getElementById('dateResult').classList.remove('show');
   document.getElementById('dateError').classList.remove('show');
