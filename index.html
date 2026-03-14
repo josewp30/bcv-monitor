@@ -31,12 +31,12 @@
   --safe-bottom:env(safe-area-inset-bottom,0px);
   --nav-h:64px;
 }
-html{height:100%;overflow:hidden}
-body{height:100%;background:linear-gradient(145deg,#060a14 0%,#0b1020 60%,#070d1a 100%);color:var(--text);font-family:'DM Sans',sans-serif;overflow:hidden;position:fixed;width:100%}
+html{height:100%;height:100dvh}
+body{height:100%;height:100dvh;max-height:100dvh;background:linear-gradient(145deg,#060a14 0%,#0b1020 60%,#070d1a 100%);color:var(--text);font-family:'DM Sans',sans-serif}
 ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--gold-border);border-radius:99px}
 
 /* ── LAYOUT ── */
-.app{display:flex;flex-direction:column;height:100vh;height:100dvh;max-width:480px;margin:0 auto;position:relative}
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh;max-height:100dvh;max-width:480px;margin:0 auto;position:relative;overflow:hidden}
 .header{padding:calc(var(--safe-top) + 14px) 18px 12px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid var(--border)}
 .content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:16px 16px calc(var(--nav-h) + var(--safe-bottom) + 16px);display:flex;flex-direction:column;gap:13px}
 .bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;padding:8px 8px calc(var(--safe-bottom) + 8px);background:rgba(6,10,20,0.97);border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);backdrop-filter:blur(20px);z-index:100;gap:2px}
@@ -141,6 +141,25 @@ body{height:100%;background:linear-gradient(145deg,#060a14 0%,#0b1020 60%,#070d1
 
 /* ── CALCULATOR ── */
 .calc-info-bar{background:var(--gold-dim);border:1px solid var(--gold-border);border-radius:12px;padding:11px 14px;font-size:12px;color:var(--gold);display:flex;align-items:center;gap:8px}
+/* Calc source tabs (USD/EUR/Custom) */
+.calc-src-tabs{display:flex;gap:3px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:3px}
+.calc-src-btn{flex:1;padding:7px 4px;border-radius:9px;border:none;cursor:pointer;font-size:11px;font-weight:700;transition:all .2s;color:var(--muted);background:transparent;font-family:'DM Sans',sans-serif;letter-spacing:.2px}
+.calc-src-btn.active{color:#060a14;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.calc-src-btn[data-src="usd"].active{background:linear-gradient(135deg,#34d399,#22c55e)}
+.calc-src-btn[data-src="eur"].active{background:linear-gradient(135deg,#60a5fa,#3b82f6)}
+.calc-src-btn[data-src="custom"].active{background:linear-gradient(135deg,#f97316,#fb923c)}
+/* Custom rate input row */
+.custom-rate-wrap{display:none;flex-direction:column;gap:6px;animation:fadeIn .2s ease}
+.custom-rate-wrap.show{display:flex}
+.custom-rate-row{display:flex;gap:8px;align-items:center}
+.custom-rate-inp{flex:1;background:rgba(249,115,22,0.07);border:1.5px solid rgba(249,115,22,0.3);border-radius:11px;padding:11px 14px;color:var(--text);font-size:18px;outline:none;transition:border-color .2s;font-family:'DM Mono',monospace;-webkit-appearance:none}
+.custom-rate-inp:focus{border-color:rgba(249,115,22,0.6)}
+.custom-rate-lbl{font-size:10px;color:rgba(249,115,22,0.8);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+/* Copy button */
+.copy-result-btn{display:none;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:8px;background:rgba(255,255,255,.06);border:1px solid var(--border2);border-radius:10px;padding:9px;color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s}
+.copy-result-btn.show{display:flex}
+.copy-result-btn:hover{background:rgba(255,255,255,.1)}
+.copy-result-btn.copied{background:var(--green-dim);border-color:rgba(34,197,94,.3);color:var(--green)}
 .calc-card{padding:18px;display:flex;flex-direction:column;gap:13px}
 .inp-lbl{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:7px}
 .inp-field{width:100%;background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.1);border-radius:11px;padding:13px 14px;color:var(--text);font-size:20px;outline:none;transition:border-color .2s;font-family:'DM Mono',monospace;-webkit-appearance:none}
@@ -340,33 +359,54 @@ body{height:100%;background:linear-gradient(145deg,#060a14 0%,#0b1020 60%,#070d1
 
       <div class="sec-title">Calculadora</div>
 
+      <!-- Source selector: USD / EUR / Custom -->
+      <div class="calc-src-tabs">
+        <button class="calc-src-btn active" data-src="usd" onclick="setCalcSource('usd')">🇺🇸 Dólar BCV</button>
+        <button class="calc-src-btn" data-src="eur" onclick="setCalcSource('eur')">🇪🇺 Euro BCV</button>
+        <button class="calc-src-btn" data-src="custom" onclick="setCalcSource('custom')">✏️ Personalizada</button>
+      </div>
+
+      <!-- Info bar — shows active rate -->
       <div class="calc-info-bar">
-        <span>📌</span>
+        <span id="calcInfoIcon">📌</span>
         <span id="calcInfoTxt">Tasa BCV Oficial — cargando...</span>
       </div>
 
-      <!-- Current rate calc -->
+      <!-- Custom rate input (only visible when source=custom) -->
+      <div class="custom-rate-wrap" id="customRateWrap">
+        <div class="custom-rate-lbl">Ingresa tu tasa personalizada (Bs por 1 unidad)</div>
+        <div class="custom-rate-row">
+          <input class="custom-rate-inp" type="number" inputmode="decimal" id="customRateInp"
+            placeholder="ej: 46.50" oninput="onCustomRateChange(this.value)">
+        </div>
+      </div>
+
+      <!-- Direction toggle -->
       <div class="seg-ctrl">
-        <button class="seg-btn active" id="btnUSD2BS" onclick="setCalcMode('usd2bs')">$ → Bs</button>
-        <button class="seg-btn" id="btnBS2USD" onclick="setCalcMode('bs2usd')">Bs → $</button>
+        <button class="seg-btn active" id="btnUSD2BS" onclick="setCalcMode('usd2bs')" id="calcDirBtn1">
+          <span id="calcDirLbl1">$ → Bs</span>
+        </button>
+        <button class="seg-btn" id="btnBS2USD" onclick="setCalcMode('bs2usd')">
+          <span id="calcDirLbl2">Bs → $</span>
+        </button>
       </div>
 
       <div class="card calc-card">
         <div>
-          <label class="inp-lbl" id="calcLbl1">Dólares (USD)</label>
+          <label class="inp-lbl" id="calcLbl1">Monto a convertir</label>
           <input class="inp-field" type="number" inputmode="decimal" id="calcIn1" placeholder="0.00" oninput="calcConvert(this.value)">
         </div>
         <div class="swap-row">
           <button class="swap-btn" onclick="swapCalc()">⇅</button>
         </div>
         <div>
-          <label class="inp-lbl" id="calcLbl2">Bolívares (Bs)</label>
+          <label class="inp-lbl" id="calcLbl2">Resultado en Bs</label>
           <input class="inp-field" type="number" id="calcIn2" placeholder="0.00" readonly>
         </div>
       </div>
 
       <div>
-        <div class="presets-lbl">Montos rápidos (USD)</div>
+        <div class="presets-lbl" id="presetsLbl">Montos rápidos</div>
         <div class="presets-grid" id="presetsGrid"></div>
       </div>
 
@@ -374,6 +414,9 @@ body{height:100%;background:linear-gradient(145deg,#060a14 0%,#0b1020 60%,#070d1
         <div class="res-lbl">Resultado</div>
         <div class="res-val" id="calcResultVal">—</div>
         <div class="res-rate" id="calcResultRate"></div>
+        <button class="copy-result-btn" id="copyResultBtn" onclick="copyResult()">
+          📋 Copiar resultado
+        </button>
       </div>
 
       <!-- Date-based calc -->
@@ -415,7 +458,12 @@ body{height:100%;background:linear-gradient(145deg,#060a14 0%,#0b1020 60%,#070d1
               <span class="dr-arrow">→</span>
               <div class="dr-output" id="drOutput">—</div>
             </div>
-            <div class="dr-note" id="drNote"></div>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+              <div class="dr-note" id="drNote" style="flex:1"></div>
+              <button class="copy-result-btn" id="copyDateResultBtn" onclick="copyDateResult()" style="width:auto;padding:7px 12px;margin:0">
+                📋 Copiar
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -545,6 +593,7 @@ let S = {
   euroRates: null,
   rateType: 'oficial',
   calcMode: 'usd2bs',
+  calcSource: 'usd',
   chartRange: 30,
   history: [],
   apiHist: [],
@@ -553,7 +602,8 @@ let S = {
   deferredInstall: null,
   dateRateCache: {},
   currentDateRate: null,
-  currentTab: 'home'
+  currentTab: 'home',
+  lastResultText: ''
 };
 
 // ═══════════════════════════════════════════
@@ -723,11 +773,20 @@ function renderDateResult(entry, requestedDate, actualDate) {
 }
 
 function calcWithDateRate(val) {
-  if (!S.currentDateRate || !val) { document.getElementById('drOutput').textContent = '—'; return; }
+  if (!S.currentDateRate || !val) {
+    document.getElementById('drOutput').textContent = '—';
+    document.getElementById('copyDateResultBtn').classList.remove('show');
+    return;
+  }
   const rate = parseR(S.currentDateRate);
   if (!rate) return;
   const result = parseFloat(val) * rate;
-  document.getElementById('drOutput').textContent = `Bs. ${fN(result)}`;
+  const formatted = `Bs. ${new Intl.NumberFormat('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(result)}`;
+  document.getElementById('drOutput').textContent = formatted;
+  const btn = document.getElementById('copyDateResultBtn');
+  btn.classList.add('show');
+  btn.classList.remove('copied');
+  btn.textContent = '📋 Copiar';
 }
 
 // ═══════════════════════════════════════════
@@ -920,57 +979,185 @@ function selectHistRow(date) {
 // ═══════════════════════════════════════════
 //  CALCULATOR
 // ═══════════════════════════════════════════
-function updateCalcInfo() {
+
+// calcSource: 'usd' | 'eur' | 'custom'
+// S.calcMode: 'usd2bs' | 'bs2usd'
+
+function getActiveRate() {
+  if (S.calcSource === 'custom') {
+    const v = parseFloat(document.getElementById('customRateInp').value);
+    return isNaN(v) ? 0 : v;
+  }
+  if (S.calcSource === 'eur') {
+    return S.euroRates ? parseR(S.euroRates.oficial) : 0;
+  }
+  // usd
   const r = S.rates ? S.rates[S.rateType] : null;
-  const val = parseR(r);
-  const lbl = S.rateType === 'oficial' ? 'BCV Oficial' : 'Paralelo';
-  document.getElementById('calcInfoTxt').textContent =
-    val ? `Tasa ${lbl} — Bs. ${fN(val, 4)} por $1 USD` : `Tasa ${lbl} — actualizando...`;
-  // Recalculate if there's a value
+  return parseR(r);
+}
+
+function getSourceLabel() {
+  if (S.calcSource === 'custom') return 'Tasa personalizada';
+  if (S.calcSource === 'eur')    return 'Euro BCV Oficial';
+  return S.rateType === 'oficial' ? 'Dólar BCV Oficial' : 'Dólar Paralelo';
+}
+
+function getCurrencySymbol() {
+  if (S.calcSource === 'eur') return '€';
+  return '$';
+}
+
+function updateCalcInfo() {
+  const rate = getActiveRate();
+  const lbl  = getSourceLabel();
+  const sym  = getCurrencySymbol();
+  const infoTxt = document.getElementById('calcInfoTxt');
+  const infoIcon = document.getElementById('calcInfoIcon');
+
+  if (S.calcSource === 'custom') {
+    infoIcon.textContent = '✏️';
+    infoTxt.textContent = rate
+      ? `Tasa personalizada — Bs. ${fN(rate, 4)} por 1 unidad`
+      : 'Tasa personalizada — ingresa la tasa arriba';
+  } else if (S.calcSource === 'eur') {
+    infoIcon.textContent = '🇪🇺';
+    infoTxt.textContent = rate
+      ? `Euro BCV Oficial — Bs. ${fN(rate, 4)} por €1`
+      : 'Euro BCV — cargando...';
+  } else {
+    infoIcon.textContent = '📌';
+    infoTxt.textContent = rate
+      ? `${lbl} — Bs. ${fN(rate, 4)} por ${sym}1`
+      : `${lbl} — cargando...`;
+  }
+
+  // Update direction labels
+  const sym2 = S.calcSource === 'eur' ? 'EUR' : 'USD';
+  document.getElementById('btnUSD2BS').querySelector('span').textContent = `${sym} → Bs`;
+  document.getElementById('btnBS2USD').querySelector('span').textContent = `Bs → ${sym}`;
+  document.getElementById('calcLbl1').textContent = S.calcMode === 'usd2bs'
+    ? `${sym2} a convertir` : 'Bolívares (Bs)';
+  document.getElementById('calcLbl2').textContent = S.calcMode === 'usd2bs'
+    ? 'Resultado en Bs' : `Resultado en ${sym2}`;
+  document.getElementById('presetsLbl').textContent =
+    `Montos rápidos (${sym2})`;
+
+  // Recalc if input has value
+  const cur = document.getElementById('calcIn1').value;
+  if (cur) calcConvert(cur);
+}
+
+function setCalcSource(src) {
+  S.calcSource = src;
+
+  // Update tab buttons
+  document.querySelectorAll('.calc-src-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.src === src);
+  });
+
+  // Show/hide custom rate input
+  document.getElementById('customRateWrap').classList.toggle('show', src === 'custom');
+
+  // Clear inputs
+  document.getElementById('calcIn1').value = '';
+  document.getElementById('calcIn2').value = '';
+  document.getElementById('calcResult').classList.remove('show');
+  document.getElementById('copyResultBtn').classList.remove('show');
+
+  updateCalcInfo();
+  refreshPresetLabels();
+}
+
+function onCustomRateChange(val) {
+  updateCalcInfo();
   const cur = document.getElementById('calcIn1').value;
   if (cur) calcConvert(cur);
 }
 
 function calcConvert(val) {
-  const r = S.rates ? S.rates[S.rateType] : null;
-  const rate = parseR(r);
-  const res = document.getElementById('calcResult');
+  const rate = getActiveRate();
+  const res  = document.getElementById('calcResult');
+  const copyBtn = document.getElementById('copyResultBtn');
+
   if (!rate || !val || isNaN(parseFloat(val))) {
     document.getElementById('calcIn2').value = '';
     res.classList.remove('show');
+    copyBtn.classList.remove('show');
     return;
   }
-  let result, resText, rateText;
+
   const amt = parseFloat(val);
+  const sym  = getCurrencySymbol();
+  const sym2 = S.calcSource === 'eur' ? 'EUR' : 'USD';
+  let result, resText, rateText;
+
   if (S.calcMode === 'usd2bs') {
-    result = (amt * rate).toFixed(2);
+    result   = (amt * rate).toFixed(2);
     document.getElementById('calcIn2').value = result;
-    resText = `Bs. ${new Intl.NumberFormat('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(result)}`;
-    rateText = `${fN(amt, 2)} USD × ${fN(rate, 4)} = Bs. ${fN(result)}`;
+    resText  = `Bs. ${new Intl.NumberFormat('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(result)}`;
+    rateText = `${fN(amt,2)} ${sym2} × ${fN(rate,4)} = Bs. ${fN(result)}`;
   } else {
-    result = (amt / rate).toFixed(6);
+    result   = (amt / rate).toFixed(6);
     document.getElementById('calcIn2').value = result;
-    resText = `$ ${new Intl.NumberFormat('es-VE',{minimumFractionDigits:2,maximumFractionDigits:6}).format(result)}`;
-    rateText = `Bs. ${fN(amt)} ÷ ${fN(rate, 4)} = $ ${fN(result, 4)}`;
+    resText  = `${sym} ${new Intl.NumberFormat('es-VE',{minimumFractionDigits:2,maximumFractionDigits:6}).format(result)}`;
+    rateText = `Bs. ${fN(amt)} ÷ ${fN(rate,4)} = ${sym} ${fN(result,4)}`;
   }
-  document.getElementById('calcResultVal').textContent = resText;
+
+  document.getElementById('calcResultVal').textContent  = resText;
   document.getElementById('calcResultRate').textContent = rateText;
   res.classList.add('show');
+  copyBtn.classList.add('show');
+  copyBtn.classList.remove('copied');
+  copyBtn.textContent = '📋 Copiar resultado';
+
+  // Store plain text for copy
+  S.lastResultText = `${resText}\n(${rateText})`;
 }
 
 function setCalcMode(mode) {
   S.calcMode = mode;
   document.getElementById('btnUSD2BS').classList.toggle('active', mode === 'usd2bs');
   document.getElementById('btnBS2USD').classList.toggle('active', mode === 'bs2usd');
-  document.getElementById('calcLbl1').textContent = mode === 'usd2bs' ? 'Dólares (USD)' : 'Bolívares (Bs)';
-  document.getElementById('calcLbl2').textContent = mode === 'usd2bs' ? 'Bolívares (Bs)' : 'Dólares (USD)';
   document.getElementById('calcIn1').value = '';
   document.getElementById('calcIn2').value = '';
   document.getElementById('calcResult').classList.remove('show');
+  document.getElementById('copyResultBtn').classList.remove('show');
+  updateCalcInfo();
 }
 
 function swapCalc() {
   setCalcMode(S.calcMode === 'usd2bs' ? 'bs2usd' : 'usd2bs');
+}
+
+function copyResult() {
+  const btn = document.getElementById('copyResultBtn');
+  const text = S.lastResultText || document.getElementById('calcResultVal').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.classList.add('copied');
+    btn.textContent = '✅ ¡Copiado!';
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.textContent = '📋 Copiar resultado';
+    }, 2200);
+  }).catch(() => {
+    showToast('No se pudo copiar', true);
+  });
+}
+
+function copyDateResult() {
+  const btn = document.getElementById('copyDateResultBtn');
+  const output = document.getElementById('drOutput').textContent;
+  const note   = document.getElementById('drNote').textContent;
+  const date   = document.getElementById('drDate').textContent;
+  const text   = `${output}\n${date} · ${note}`;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.classList.add('copied');
+    btn.textContent = '✅ Copiado';
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.textContent = '📋 Copiar';
+    }, 2200);
+  }).catch(() => showToast('No se pudo copiar', true));
 }
 
 function renderPresets() {
@@ -978,13 +1165,22 @@ function renderPresets() {
   [1, 5, 10, 20, 50, 100, 500, 1000].forEach(amt => {
     const btn = document.createElement('button');
     btn.className = 'preset-btn';
-    btn.textContent = `$${amt}`;
+    const sym = S.calcSource === 'eur' ? '€' : '$';
+    btn.textContent = `${sym}${amt}`;
+    btn.dataset.amt = amt;
     btn.onclick = () => {
       if (S.calcMode !== 'usd2bs') setCalcMode('usd2bs');
       document.getElementById('calcIn1').value = amt;
       calcConvert(amt);
     };
     grid.appendChild(btn);
+  });
+}
+
+function refreshPresetLabels() {
+  const sym = S.calcSource === 'eur' ? '€' : '$';
+  document.querySelectorAll('#presetsGrid .preset-btn').forEach(btn => {
+    btn.textContent = `${sym}${btn.dataset.amt}`;
   });
 }
 
