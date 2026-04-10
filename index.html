@@ -38,7 +38,7 @@ body{background:linear-gradient(145deg,#060a14 0%,#0b1020 60%,#070d1a 100%);colo
 .app{display:flex;flex-direction:column;min-height:100vh;min-height:100svh;max-width:480px;margin:0 auto;position:relative}
 .header{padding:calc(var(--safe-top) + 14px) 18px 12px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid var(--border)}
 .content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:16px 16px 90px;display:flex;flex-direction:column;gap:13px;touch-action:pan-y}
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;width:100%;max-width:480px;margin:0 auto;padding:8px 8px 12px;background:rgba(6,10,20,0.98);border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);z-index:999;gap:2px;touch-action:manipulation}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;width:100%;max-width:480px;margin:0 auto;background:rgba(6,10,20,0.98);border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);z-index:999;touch-action:manipulation}
 
 /* ── HEADER ── */
 .logo{display:flex;align-items:center;gap:9px}
@@ -53,11 +53,11 @@ body{background:linear-gradient(145deg,#060a14 0%,#0b1020 60%,#070d1a 100%);colo
 .offline-badge.show{display:block}
 
 /* ── NAV ── */
-.nav-item{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:5px 4px;border:none;background:none;color:var(--dim);font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;font-family:'DM Sans',sans-serif;transition:color .15s;border-radius:10px;position:relative;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none}
+.nav-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;padding:12px 4px calc(12px + var(--safe-bottom));border:none;background:none;color:var(--dim);font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;font-family:'DM Sans',sans-serif;transition:all .15s;position:relative;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none}
 .nav-item.active{color:var(--gold)}
 .nav-item .ni{font-size:19px;transition:transform .2s}
 .nav-item.active .ni{transform:scale(1.1)}
-.nav-dot{width:18px;height:2.5px;background:var(--gold);border-radius:99px;position:absolute;bottom:-2px;opacity:0;transition:opacity .2s}
+.nav-dot{width:18px;height:2.5px;background:var(--gold);border-radius:99px;position:absolute;bottom:calc(var(--safe-bottom) + 3px);opacity:0;transition:opacity .2s}
 .nav-item.active .nav-dot{opacity:1}
 
 /* ── TABS ── */
@@ -161,9 +161,14 @@ body{background:linear-gradient(145deg,#060a14 0%,#0b1020 60%,#070d1a 100%);colo
 .copy-result-btn.copied{background:var(--green-dim);border-color:rgba(34,197,94,.3);color:var(--green)}
 .calc-card{padding:18px;display:flex;flex-direction:column;gap:13px}
 .inp-lbl{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:7px}
-.inp-field{width:100%;background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.1);border-radius:11px;padding:13px 14px;color:var(--text);font-size:20px;outline:none;transition:border-color .2s;font-family:'DM Mono',monospace;-webkit-appearance:none}
+.inp-wrap{position:relative;display:flex;align-items:center}
+.inp-field{width:100%;background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.1);border-radius:11px;padding:13px 44px 13px 14px;color:var(--text);font-size:20px;outline:none;transition:border-color .2s;font-family:'DM Mono',monospace;-webkit-appearance:none}
 .inp-field:focus{border-color:var(--gold-border);background:rgba(255,255,255,.07)}
-.inp-field[readonly]{opacity:.7;cursor:default}
+.inp-field[readonly]{opacity:.9;cursor:default;padding-right:44px}
+.inp-btn{position:absolute;right:8px;width:32px;height:32px;border-radius:8px;border:none;background:rgba(255,255,255,0.08);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s;z-index:2;font-size:16px}
+.inp-btn:active{transform:scale(0.9);background:rgba(255,255,255,0.15)}
+.inp-btn.clear-btn{color:var(--red);background:rgba(239,68,68,0.1)}
+.inp-btn.copy-btn{color:var(--gold);background:rgba(251,191,36,0.1)}
 .swap-row{display:flex;justify-content:center}
 .swap-btn{width:38px;height:38px;border-radius:50%;background:var(--gold-dim);border:1.5px solid var(--gold-border);display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;transition:all .2s}
 .swap-btn:hover{background:rgba(251,191,36,.22);transform:rotate(180deg)}
@@ -246,7 +251,7 @@ body{background:linear-gradient(145deg,#060a14 0%,#0b1020 60%,#070d1a 100%);colo
   .card:active{background:var(--card2)}
   .btn-sm:active{transform:scale(.97)}
   .preset-btn:active{transform:scale(.96)}
-  .nav-item:active{opacity:.7}
+  .nav-item:active{opacity:.7;transform:scale(0.94)}
 }
 </style>
 </head>
@@ -392,14 +397,20 @@ body{background:linear-gradient(145deg,#060a14 0%,#0b1020 60%,#070d1a 100%);colo
       <div class="card calc-card">
         <div>
           <label class="inp-lbl" id="calcLbl1">Monto a convertir</label>
-          <input class="inp-field" type="number" inputmode="decimal" id="calcIn1" placeholder="0.00" oninput="calcConvert(this.value)">
+          <div class="inp-wrap">
+            <input class="inp-field" type="number" inputmode="decimal" id="calcIn1" placeholder="0.00" oninput="calcConvert(this.value)">
+            <button class="inp-btn clear-btn" onclick="clearCalc()" title="Borrar">✕</button>
+          </div>
         </div>
         <div class="swap-row">
           <button class="swap-btn" onclick="swapCalc()">⇅</button>
         </div>
         <div>
           <label class="inp-lbl" id="calcLbl2">Resultado en Bs</label>
-          <input class="inp-field" type="number" id="calcIn2" placeholder="0.00" readonly>
+          <div class="inp-wrap">
+            <input class="inp-field" type="number" id="calcIn2" placeholder="0.00" readonly>
+            <button class="inp-btn copy-btn" onclick="copyResultFromInp()" title="Copiar">📋</button>
+          </div>
         </div>
       </div>
 
@@ -1274,26 +1285,41 @@ function refreshPresetLabels() {
   });
 }
 
+function clearCalc() {
+  const in1 = document.getElementById('calcIn1');
+  in1.value = '';
+  in1.focus();
+  calcConvert('');
+}
+
+function copyResultFromInp() {
+  const val = document.getElementById('calcIn2').value;
+  if (!val) return;
+  navigator.clipboard.writeText(val).then(() => {
+    showToast('✅ Monto copiado');
+  });
+}
+
 // ═══════════════════════════════════════════
 //  TAB + RATE TYPE
 // ═══════════════════════════════════════════
 let tabSwitching = false;
 function setTab(tab) {
-  if (tabSwitching || S.currentTab === tab) return;
-  tabSwitching = true;
+  if (S.currentTab === tab) return;
   S.currentTab = tab;
 
   ['home','calc','hist','cfg'].forEach(t => {
-    document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
-    document.getElementById(`nav-${t}`).classList.toggle('active', t === tab);
+    const tabEl = document.getElementById(`tab-${t}`);
+    const navEl = document.getElementById(`nav-${t}`);
+    if (tabEl) tabEl.classList.toggle('active', t === tab);
+    if (navEl) navEl.classList.toggle('active', t === tab);
   });
 
-  document.getElementById('mainContent').scrollTop = 0;
+  const mainContent = document.getElementById('mainContent');
+  if (mainContent) mainContent.scrollTop = 0;
 
   if (tab === 'hist') fetchApiHistory();
   if (tab === 'cfg') updateCfgInfo();
-
-  setTimeout(() => { tabSwitching = false; }, 150);
 }
 
 function setRateType(type) {
